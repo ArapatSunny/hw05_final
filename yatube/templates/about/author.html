@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Об авторе проекта{% endblock %}
+{% block content %}
+
+  <div class="row">
+    <!-- Левый вспомогательный блок -->
+    <div class="col-md-3 mb-3 mt-1">
+      <div class="card">
+        <div class="card-body">
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <div class="h3">
+                Об авторе
+                <img class="w-50 mx-auto d-block" src="{% static 'workspace.png' %}" alt="photo"/>
+            </li>
+            <li class="list-group-item">
+              <div class="h6 text-muted">
+                <a href="https://github.com/ArapatSunny" 
+                   target="_blank" rel="noopener noreferrer" 
+                   icon:logo class="text-secondary">
+                    GitHub</a>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <!-- Тело страницы -->
+    <div class="col-md-9">
+      <div class="card-body">
+        <div class="card-text">
+          <p>Привет!<br>
+            Меня зовут Арапат.<br>
+            Работаю в кофейне) 
+            Решила найти свой путь и попробовать силы в программировании.<br>
+            Практикум мой самый первый курс)))
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Профиль пользователя{% endblock %}
+
+{% block content %}
+
+<main role="main" class="container">
+    <div class="row">
+      <div class="col-md-3 mb-3 mt-1">
+        <div class="card">
+          <div class="card-body">
+            <div class="h2">
+              <p>{{ author.first_name }} {{ author.last_name }}</p>
+            </div>
+            <div class="h3 text-muted">
+              <p>@{{ author }}</p>
+            </div>
+          </div>
+          <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <div class="h6 text-muted">
+                Подписчиков: {{ author.following.count }} <br>
+                Подписан: {{ author.follower.count }}
+              </div>
+            </li>
+            <li class="list-group-item">
+              <div class="h6 text-muted">
+                Записей: {{ author.posts.count }}
+              </div>
+              {% if user != author %}
+              {% include "follow_menu.html" with profile=profile %}
+              {% endif %}
+            </li>
+          </ul>
+        </div>
+      </div>
+  
+      <div class="col-md-9">
+        {% for post in page %}
+          {% include "post_item.html" with post=post %}
+        {% endfor %}
+        <hr>
+        {% include "paginator.html" with items=page paginator=paginator%}
+      </div>
+    </div>
+  </main>
+
+  {% endblock %}

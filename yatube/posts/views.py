@@ -52,16 +52,11 @@ def post_view(request, username, post_id):
         Post, author__username=username,
         id=post_id)
     comments = post.comments.filter(post=post)
-    if request.user.is_authenticated:
-        form = CommentForm(request.POST or None)
-        return render(request, 'post.html',
-                      {'post': post, 'form': form,
-                       'comments': comments,
-                       'author': author})
-    return render(
-        request, 'post.html',
-        {'post': post, 'comments': comments,
-         'author': author})
+    form = CommentForm(request.POST or None)
+    return render(request, 'post.html',
+                  {'post': post, 'form': form,
+                   'comments': comments,
+                   'author': author})
 
 
 @login_required

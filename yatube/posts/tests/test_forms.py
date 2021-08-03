@@ -1,17 +1,15 @@
 import shutil
 import tempfile
 import unittest
+from http import HTTPStatus
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
-from django.contrib.auth import get_user_model
-
-from http import HTTPStatus
-
-from posts.forms import PostForm, CommentForm
-from posts.models import Group, Post, Comment
+from posts.forms import CommentForm, PostForm
+from posts.models import Comment, Group, Post
 
 User = get_user_model()
 
@@ -148,7 +146,7 @@ class CommentFormTest(TestCase):
             follow=True
         )
         self.assertRedirects(response, reverse('post', kwargs={
-            'username': 'PostAuthor',
+            'username': CommentFormTest.post0.author.username,
             'post_id': CommentFormTest.post0.id
         }))
         self.assertEqual(Comment.objects.count(), comments_count + 1)
@@ -176,7 +174,7 @@ class CommentFormTest(TestCase):
             follow=True
         )
         self.assertRedirects(response, reverse('post', kwargs={
-            'username': 'PostAuthor',
+            'username': CommentFormTest.post0.author.username,
             'post_id': CommentFormTest.post0.id
         }))
         self.assertEqual(Comment.objects.count(), comments_count + 1 + 1)

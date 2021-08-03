@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Записи сообщества {{ group.title }} | Yatube{% endblock %}
 {% block header %}{{ group.title }}{% endblock %}
+
 {% block content %}
 
-    <p>{{ group.description|linebreaksbr }}</p>
+  <p>{{ group.description|linebreaksbr }}</p>
 
-    {% for post in page %}
-      {% include "post_item.html" with post=post %}
-    <p>{{ post.text|linebreaksbr }}</p>
-    {% endfor %}<hr>
+  {% for post in page %}
+    {% include "includes/post_item.html" with post=post %}
+      <p>{{ post.text|linebreaksbr }}</p>
+  {% endfor %}<hr>
 
-    {% include "paginator.html" with items=page paginator=paginator%}
+  {% include "includes/paginator.html" with items=page paginator=paginator%}
 
 {% endblock %}

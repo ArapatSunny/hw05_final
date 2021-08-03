@@ -1,16 +1,17 @@
-from django.core.paginator import Paginator
-from django.shortcuts import get_object_or_404, render, redirect
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import cache_page
 
-from .models import Group, Post, User, Follow
-from .forms import PostForm, CommentForm
+from .forms import CommentForm, PostForm
+from .models import Follow, Group, Post, User
 
 
 @cache_page(20)
 def index(request):
     post_list = Post.objects.all()
-    paginator = Paginator(post_list, 10)
+    paginator = Paginator(post_list, settings.POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
     return render(request, 'index.html', {'page': page, })
@@ -19,7 +20,7 @@ def index(request):
 def group_posts(request, slug):
     group = get_object_or_404(Group, slug=slug)
     group_post_list = group.posts.all()
-    paginator = Paginator(group_post_list, 10)
+    paginator = Paginator(group_post_list, settings.POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
     return render(request, 'group.html',
@@ -29,9 +30,16 @@ def group_posts(request, slug):
 def profile(request, username):
     author = get_object_or_404(User, username=username)
     author_posts = author.posts.all()
-    paginator = Paginator(author_posts, 10)
+    paginator = Paginator(author_posts, settings.POSTS_PER_PAGE)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
+    user = request.user
+    if user.is_authenticated:
+        following = Follow.objects.filter(user=user, author=author).exists()
+        return render(request, 'profile.html', {
+                      'author': author,
+                      'page': page,
+                      'following': following, })
     return render(request, 'profile.html', {
         'author': author,
         'page': page,
@@ -39,14 +47,21 @@ def profile(request, username):
 
 
 def post_view(request, username, post_id):
-    form = CommentForm(request.POST or None)
+    author = get_object_or_404(User, username=username)
     post = get_object_or_404(
         Post, author__username=username,
         id=post_id)
     comments = post.comments.filter(post=post)
+    if request.user.is_authenticated:
+        form = CommentForm(request.POST or None)
+        return render(request, 'post.html',
+                      {'post': post, 'form': form,
+                       'comments': comments,
+                       'author': author})
     return render(
         request, 'post.html',
-        {'post': post, 'form': form, 'comments': comments})
+        {'post': post, 'comments': comments,
+         'author': author})
 
 
 @login_required
@@ -122,29 +137,13 @@ def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
     if user == author:
         return redirect('profile', username)
-    followed = Follow.objects.filter(user=user, author=author)
-    following = True if followed else False
-
-    if following:
-        return redirect('profile', username)
-    else:
-        model = Follow.objects.create(
-            user=request.user, author=author)
-        model.save()
-        return redirect('profile', username)
+    obj, create = Follow.objects.get_or_create(user=user, author=author)
+    return redirect('profile', username)
 
 
 @login_required
 def profile_unfollow(request, username):
     user = request.user
     author = get_object_or_404(User, username=username)
-    followed = Follow.objects.filter(user=user, author=author)
-    following = True if followed else False
-
-    if following:
-        model = Follow.objects.filter(
-            user=request.user, author=author)
-        model.delete()
-        return redirect('profile', username)
-    else:
-        return redirect('profile', username)
+    Follow.objects.filter(user=user, author=author).delete()
+    return redirect('profile', username)

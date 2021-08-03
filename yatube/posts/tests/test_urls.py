@@ -1,11 +1,9 @@
-from django.contrib.auth import get_user_model
-from django.test import TestCase, Client
-from django.urls import reverse
-from django.core.cache import cache
-
 from http import HTTPStatus
 
-
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.test import Client, TestCase
+from django.urls import reverse
 from posts.models import Group, Post
 
 User = get_user_model()
@@ -44,19 +42,23 @@ class URLTests(TestCase):
             'username': cls.user,
             'post_id': cls.post.id})
 
+        cls.profile_address = reverse('profile', kwargs={
+            'username': cls.user
+        })
+
         cls.templates_urls = {
             'index.html': '/',
-            'group.html': '/group/testUrls/',
+            'group.html': f'/group/{cls.group.slug}/',
             'new.html': '/new/',
             'profile.html': f'/{cls.post.author.username}/',
             'post.html': cls.post_id_address,
         }
 
-        cls.templates_access = {
+        cls.urls_access = {
             '/': cls.guest_client,
             '/group/testUrls/': cls.guest_client,
             '/new/': cls.authorized_client2,
-            '/TestingURLMan/': cls.guest_client,
+            cls.profile_address: cls.guest_client,
             cls.post_id_address: cls.guest_client,
             cls.post_edit_address: cls.authorized_client,
         }
@@ -67,11 +69,11 @@ class URLTests(TestCase):
     def tearDown(self):
         cache.clear()
 
-    def test_templates_access(self):
+    def test_urls_access(self):
         """Проверка доступа страниц."""
-        for template, access in URLTests.templates_access.items():
-            with self.subTest(template=template):
-                response = access.get(template)
+        for url, access in URLTests.urls_access.items():
+            with self.subTest(url=url):
+                response = access.get(url)
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_post_edit_access_for_not_author_post(self):

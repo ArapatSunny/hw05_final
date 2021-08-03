@@ -2,16 +2,14 @@ import shutil
 import tempfile
 import time
 
+from django import forms
 from django.conf import settings
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.cache import cache
-
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
-from django import forms
-
-from posts.models import Group, Post, Follow
+from posts.models import Follow, Group, Post
 
 User = get_user_model()
 
@@ -61,7 +59,6 @@ class PostsPagesTests(TestCase):
             text='Тест-пост для view без указания группы',
             author=cls.user,
         )
-        time.sleep(0.1)
         cls.post1 = Post.objects.create(
             text='Тест-пост 1 для view группы 1',
             author=cls.user,
@@ -101,13 +98,19 @@ class PostsPagesTests(TestCase):
         """URL-адрес использует соответствующий шаблон."""
         templates_pages_names = {
             reverse('index'): 'index.html',
-            reverse('group_posts', kwargs={'slug': 'test_views_slug'}):
+            reverse('group_posts',
+                    kwargs={'slug': PostsPagesTests.group.slug}):
             'group.html',
-            reverse('post_edit', kwargs={'username': 'ViewTestMan',
-                    'post_id': 1}): 'new.html',
+            reverse('post_edit',
+                    kwargs={
+                        'username': PostsPagesTests.post0.author.username,
+                        'post_id': PostsPagesTests.post0.id}):
+            'new.html',
             reverse('new_post'): 'new.html',
             reverse('profile', kwargs={
-                    'username': 'ViewTestMan'}): 'profile.html',
+                    'username': PostsPagesTests.user.username}):
+            'profile.html',
+            reverse('follow_index'): 'follow.html'
         }
         for reverse_name, template in templates_pages_names.items():
             with self.subTest(reverse_name=reverse_name):
@@ -123,7 +126,7 @@ class PostsPagesTests(TestCase):
     def test_group_page_shows_correct_context(self):
         """Шаблон group сформирован с правильным контекстом."""
         response = PostsPagesTests.guest_client.get(reverse(
-            'group_posts', kwargs={'slug': 'test_views_slug'})
+            'group_posts', kwargs={'slug': PostsPagesTests.group.slug})
         )
         self.assertEqual(response.context['page'].number, 1)
         self.assertEqual(response.context['group'], PostsPagesTests.group)
@@ -138,7 +141,7 @@ class PostsPagesTests(TestCase):
         """Шаблон post_edit сформирован с правильным контекстом."""
         response = PostsPagesTests.authorized_client.get(reverse(
             'post_edit', kwargs={
-                'username': PostsPagesTests.post1.author,
+                'username': PostsPagesTests.post1.author.username,
                 'post_id': PostsPagesTests.post1.id}))
         PostsPagesTests.sub_test_is_instance(self, response)
 
@@ -146,7 +149,7 @@ class PostsPagesTests(TestCase):
         """Шаблон profile сформирован с правильным контекстом."""
         response = PostsPagesTests.authorized_client.get(reverse(
             'profile', kwargs={
-                'username': PostsPagesTests.post1.author.username}))
+                'username': PostsPagesTests.user.username}))
         self.assertEqual(response.context['author'].username, 'ViewTestMan')
         self.assertEqual(response.context['page'].number, 1)
 
@@ -157,6 +160,15 @@ class PostsPagesTests(TestCase):
                 'username': PostsPagesTests.post1.author.username,
                 'post_id': PostsPagesTests.post1.id}))
         self.assertEqual(response.context['post'], PostsPagesTests.post1)
+        self.assertEqual(str(response.context['author']),
+                         PostsPagesTests.post1.author.username)
+        form_fields = {
+            'text': forms.fields.CharField,
+        }
+        for value, expected in form_fields.items():
+            with self.subTest(value=value):
+                form_field = response.context['form'].fields[value]
+                return self.assertIsInstance(form_field, expected)
 
     def test_index_page_contains_posts(self):
         """Посты с группой и без группы попадают на главную страницу"""
@@ -167,7 +179,7 @@ class PostsPagesTests(TestCase):
         """Пост попал в группу для которой был предназначен
         и не попал в группу для которой не был предназначен"""
         response1 = PostsPagesTests.guest_client.get(reverse(
-            'group_posts', kwargs={'slug': 'test_views_slug'}))
+            'group_posts', kwargs={'slug': PostsPagesTests.group.slug}))
         post_group1_count = len(response1.context.get('page').object_list)
         self.assertEqual(post_group1_count, 1)
         post_group1 = response1.context.get('page').object_list[0]
@@ -175,7 +187,7 @@ class PostsPagesTests(TestCase):
         self.assertEqual(post_group1.author.username, 'ViewTestMan')
         self.assertEqual(post_group1.group.title, 'TitleGroupViewsTest')
         response2 = PostsPagesTests.guest_client.get(reverse(
-            'group_posts', kwargs={'slug': 'test_views_slug2'}))
+            'group_posts', kwargs={'slug': PostsPagesTests.group2.slug}))
         post_group2_count = len(response2.context.get('page').object_list)
         self.assertEqual(post_group2_count, 1)
         post_group2 = response2.context.get('page').object_list[0]
@@ -196,13 +208,15 @@ class PostsPagesTests(TestCase):
         """Проверка при выводе поста с картинкой изображение
         передаётся в словаре context."""
         response_index = PostsPagesTests.guest_client.get(reverse('index'))
-        response_profile = PostsPagesTests.guest_client.get(
-            reverse('profile', kwargs={'username': PostsPagesTests.user2}))
+        response_profile = PostsPagesTests.authorized_client.get(reverse(
+            'profile', kwargs={
+                'username': PostsPagesTests.user2.username}))
         response_group = PostsPagesTests.guest_client.get(
-            reverse('group_posts', kwargs={'slug': 'test_views_slug2'}))
+            reverse('group_posts',
+                    kwargs={'slug': PostsPagesTests.group2.slug}))
         response_post = PostsPagesTests.guest_client.get(
             reverse('post', kwargs={
-                'username': PostsPagesTests.user2,
+                'username': PostsPagesTests.post2.author.username,
                 'post_id': PostsPagesTests.post2.id}))
         pages_context_list = [
             response_index.context.get('page').object_list[0].image,
@@ -271,25 +285,37 @@ class FollowViewsTest(TestCase):
         cls.authorized_client2 = Client()
         cls.authorized_client2.force_login(cls.user2)
 
+    def check_follow_false(self):
+        follow = Follow.objects.filter(
+            user=FollowViewsTest.user1,
+            author=FollowViewsTest.user0).exists()
+        return self.assertFalse(follow)
+
+    def check_follow_true(self):
+        follow = Follow.objects.filter(
+            user=FollowViewsTest.user1,
+            author=FollowViewsTest.user0
+        ).exists()
+        return self.assertTrue(follow)
+
     def test_authorized_user_can_follow_and_unfollow_authors(self):
         """Авторизованный пользователь может подписываться на других
         пользователей и удалять их из подписок."""
-        follows = Follow.objects.count()
-        self.assertEqual(follows, 0)
+        FollowViewsTest.check_follow_false(self)
 
-        Follow.objects.create(
-            user=FollowViewsTest.user1,
-            author=FollowViewsTest.user0)
-        follows = Follow.objects.count()
-        self.assertEqual(follows, 1)
+        FollowViewsTest.authorized_client1.post(
+            reverse('profile_follow',
+                    kwargs={'username': FollowViewsTest.user0.username}),
+            follow=True)
 
-        following = Follow.objects.all()
-        self.assertEqual(str(following[0]), 'User1 follows User0')
+        FollowViewsTest.check_follow_true(self)
 
-        follow_user0 = Follow.objects.filter(user=FollowViewsTest.user1)
-        follow_user0.delete()
-        follows = Follow.objects.count()
-        self.assertEqual(follows, 0)
+        FollowViewsTest.authorized_client1.post(
+            reverse('profile_unfollow',
+                    kwargs={'username': FollowViewsTest.user0.username}),
+            follow=True)
+
+        FollowViewsTest.check_follow_false(self)
 
     def test_post_appears_only_in_line_of_following_user(self):
         """Новая запись пользователя появляется в ленте тех, кто на него подписан

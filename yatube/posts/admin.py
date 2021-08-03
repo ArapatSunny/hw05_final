@@ -13,4 +13,23 @@ class PostAdmin(admin.ModelAdmin):
 
 @admin.register(models.Group)
 class GroupAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('title', 'slug', 'description',)
+    search_fields = ('slug',)
+    list_filter = ('title',)
+    empty_value_display = '-пусто-'
+
+
+@admin.register(models.Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ('post', 'author', 'text',)
+    search_fields = ('author',)
+    list_filter = ('created',)
+    empty_value_display = '-пусто-'
+
+
+@admin.register(models.Follow)
+class FollowAdmin(admin.ModelAdmin):
+    list_display = ('user', 'author',)
+    search_fields = ('user', 'author',)
+    list_filter = ('created',)
+    empty_value_display = '-пусто-'

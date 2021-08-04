@@ -55,21 +55,11 @@ class PostsPagesTests(TestCase):
             slug='test_views_slug2',
             description='Тест группа 2 для view-тестов',
         )
-        cls.post0 = Post.objects.create(
-            text='Тест-пост для view без указания группы',
-            author=cls.user,
-        )
         cls.post1 = Post.objects.create(
             text='Тест-пост 1 для view группы 1',
             author=cls.user,
             group=cls.group,
-        )
-        time.sleep(0.1)
-        cls.post2 = Post.objects.create(
-            text='Тест-пост 2 для view группы 2',
-            author=cls.user2,
-            group=cls.group2,
-            image=cls.uploaded
+            image=cls.uploaded,
         )
 
     def setUp(self):
@@ -103,8 +93,8 @@ class PostsPagesTests(TestCase):
             'group.html',
             reverse('post_edit',
                     kwargs={
-                        'username': PostsPagesTests.post0.author.username,
-                        'post_id': PostsPagesTests.post0.id}):
+                        'username': PostsPagesTests.post1.author.username,
+                        'post_id': PostsPagesTests.post1.id}):
             'new.html',
             reverse('new_post'): 'new.html',
             reverse('profile', kwargs={
@@ -121,7 +111,7 @@ class PostsPagesTests(TestCase):
         """Шаблон home сформирован с правильным контекстом."""
         response = PostsPagesTests.guest_client.get(reverse('index'))
         self.assertEqual(response.context['page'].number, 1)
-        self.assertEqual(len(response.context.get('page').object_list), 3)
+        self.assertEqual(len(response.context.get('page').object_list), 1)
 
     def test_group_page_shows_correct_context(self):
         """Шаблон group сформирован с правильным контекстом."""
@@ -172,12 +162,14 @@ class PostsPagesTests(TestCase):
 
     def test_index_page_contains_posts(self):
         """Посты с группой и без группы попадают на главную страницу"""
+        Post.objects.create(
+            text='Тест-пост для view без группы',
+            author=PostsPagesTests.user)
         response0 = PostsPagesTests.guest_client.get(reverse('index'))
-        self.assertEqual(len(response0.context.get('page').object_list), 3)
+        self.assertEqual(len(response0.context.get('page').object_list), 2)
 
     def test_group_post_contains_expected_group_post(self):
-        """Пост попал в группу для которой был предназначен
-        и не попал в группу для которой не был предназначен"""
+        """Пост попал в группу для которой был предназначен."""
         response1 = PostsPagesTests.guest_client.get(reverse(
             'group_posts', kwargs={'slug': PostsPagesTests.group.slug}))
         post_group1_count = len(response1.context.get('page').object_list)
@@ -186,10 +178,21 @@ class PostsPagesTests(TestCase):
         self.assertEqual(post_group1.text, 'Тест-пост 1 для view группы 1')
         self.assertEqual(post_group1.author.username, 'ViewTestMan')
         self.assertEqual(post_group1.group.title, 'TitleGroupViewsTest')
+
+    def test_group_post_not_contains_unexpected_group_post(self):
+        """Пост не попал в группу для которой не был предназначен."""
+        Post.objects.create(
+            text='Тест-пост 2 для view группы 2',
+            author=PostsPagesTests.user2,
+            group=PostsPagesTests.group2,
+        )
         response2 = PostsPagesTests.guest_client.get(reverse(
             'group_posts', kwargs={'slug': PostsPagesTests.group2.slug}))
         post_group2_count = len(response2.context.get('page').object_list)
         self.assertEqual(post_group2_count, 1)
+        response1 = PostsPagesTests.guest_client.get(reverse(
+            'group_posts', kwargs={'slug': PostsPagesTests.group.slug}))
+        post_group1 = response1.context.get('page').object_list[0]
         post_group2 = response2.context.get('page').object_list[0]
         self.assertNotEqual(post_group1, post_group2)
 
@@ -208,16 +211,16 @@ class PostsPagesTests(TestCase):
         """Проверка при выводе поста с картинкой изображение
         передаётся в словаре context."""
         response_index = PostsPagesTests.guest_client.get(reverse('index'))
-        response_profile = PostsPagesTests.authorized_client.get(reverse(
+        response_profile = PostsPagesTests.guest_client.get(reverse(
             'profile', kwargs={
-                'username': PostsPagesTests.user2.username}))
+                'username': PostsPagesTests.user.username}))
         response_group = PostsPagesTests.guest_client.get(
             reverse('group_posts',
-                    kwargs={'slug': PostsPagesTests.group2.slug}))
+                    kwargs={'slug': PostsPagesTests.group.slug}))
         response_post = PostsPagesTests.guest_client.get(
             reverse('post', kwargs={
-                'username': PostsPagesTests.post2.author.username,
-                'post_id': PostsPagesTests.post2.id}))
+                'username': PostsPagesTests.post1.author.username,
+                'post_id': PostsPagesTests.post1.id}))
         pages_context_list = [
             response_index.context.get('page').object_list[0].image,
             response_profile.context.get('page').object_list[0].image,
@@ -228,15 +231,16 @@ class PostsPagesTests(TestCase):
             self.assertEqual(pages_context, 'posts/small.gif')
 
     def test_index_cache_page(self):
+        """Проверка кеширования главной страницы 20 секунд."""
         response0 = PostsPagesTests.guest_client.get(reverse('index'))
         len0 = len(response0.context.get('page').object_list)
-        self.assertEqual(len0, 3)
+        self.assertEqual(len0, 1)
 
-        post1 = Post.objects.create(
+        post2 = Post.objects.create(
             text='Cache+1',
             author=PostsPagesTests.user,
         )
-        post1.save()
+        post2.save()
 
         response1 = PostsPagesTests.guest_client.get(reverse('index'))
         self.assertIsNone(response1.context)
@@ -244,18 +248,20 @@ class PostsPagesTests(TestCase):
         time.sleep(20)
         response1 = PostsPagesTests.guest_client.get(reverse('index'))
         len1 = len(response1.context.get('page').object_list)
-        self.assertEqual(len1, 4)
+        self.assertEqual(len1, 2)
 
     def test_cache(self):
+        """Запись из базы остаётся в response.content главной страницы
+        до тех пор, пока кеш не будет очищен принудительно."""
         response0 = PostsPagesTests.guest_client.get(reverse('index'))
         len0 = len(response0.context.get('page').object_list)
-        self.assertEqual(len0, 3)
+        self.assertEqual(len0, 1)
 
-        post2 = Post.objects.filter(author=PostsPagesTests.user2)
-        post2.delete()
+        post = Post.objects.filter(author=PostsPagesTests.user)
+        post.delete()
 
         response1 = PostsPagesTests.guest_client.get(reverse('index'))
-        p = '<a name="post_2'
+        p = '<a name="post'
         encode = p.encode()
         self.assertTrue(encode in response1.content)
 
@@ -263,7 +269,7 @@ class PostsPagesTests(TestCase):
 
         response2 = PostsPagesTests.guest_client.get(reverse('index'))
         len2 = len(response2.context.get('page').object_list)
-        self.assertEqual(len2, 2)
+        self.assertEqual(len2, 0)
 
 
 class FollowViewsTest(TestCase):
@@ -298,7 +304,7 @@ class FollowViewsTest(TestCase):
         ).exists()
         return self.assertTrue(follow)
 
-    def test_authorized_user_can_follow_and_unfollow_authors(self):
+    def test_authorized_user_can_follow_authors(self):
         """Авторизованный пользователь может подписываться на других
         пользователей и удалять их из подписок."""
         FollowViewsTest.check_follow_false(self)
@@ -307,6 +313,15 @@ class FollowViewsTest(TestCase):
             reverse('profile_follow',
                     kwargs={'username': FollowViewsTest.user0.username}),
             follow=True)
+
+        FollowViewsTest.check_follow_true(self)
+
+    def test_authorized_user_can_unfollow_authors(self):
+        """Авторизованный пользователь может удалять подписку
+        на других пользователей."""
+        Follow.objects.create(
+            user=FollowViewsTest.user1,
+            author=FollowViewsTest.user0)
 
         FollowViewsTest.check_follow_true(self)
 

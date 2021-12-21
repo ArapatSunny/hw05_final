@@ -149,10 +149,16 @@ dmypy.json
 static/
 yatube/posts/static/
 yatube/media/
+yatube/dump.json
 
 .mypy_cache
 
 
+yatube/static/
+yatube/.static
+
+yatube/media
+yatube/.media
 
 htmlcov/
 .coverage
@@ -160,5 +166,6 @@ htmlcov/
 coverage.xml
 *.cover
 
+yatube/posts/static
 
 

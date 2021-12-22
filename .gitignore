@@ -151,6 +151,8 @@ yatube/posts/static/
 yatube/media/
 yatube/dump.json
 
+.github
+
 .mypy_cache
 
 
@@ -168,4 +170,5 @@ coverage.xml
 
 yatube/posts/static
 
+yatube/yatube/.env
 
